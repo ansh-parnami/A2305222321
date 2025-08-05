@@ -32,12 +32,12 @@ public class UrlShortenerService {
         this.logService = logService;
     }
 
-    public UrlMapping createShortUrl(CreateUrlRequest request, String authToken) {
+    public UrlMapping createShortUrl(CreateUrlRequest request) {
         String shortcode;
         if (request.getShortcode() != null && !request.getShortcode().isBlank()) {
             shortcode = request.getShortcode();
             if (urlMappingRepository.existsById(shortcode)) {
-                logService.log(authToken, "warn", "service", "Custom shortcode conflict: " + shortcode);
+                logService.log("warn", "service", "Shortener", "Custom shortcode conflict: " + shortcode);
                 return null;
             }
         } else {
@@ -54,21 +54,21 @@ public class UrlShortenerService {
                 .build();
 
         UrlMapping saved = urlMappingRepository.save(urlMapping);
-        logService.log(authToken, "info", "service", "Created new short link with code: " + shortcode);
+        logService.log("info", "service", "Shortener", "Created short link with code: " + shortcode);
         return saved;
     }
 
     @Transactional
-    public String getOriginalUrlAndLogClick(String shortcode, String referrer, String ipAddress, String authToken) {
+    public String getOriginalUrlAndLogClick(String shortcode, String referrer, String ipAddress) {
         UrlMapping urlMapping = urlMappingRepository.findById(shortcode).orElse(null);
 
         if (urlMapping == null) {
-            logService.log(authToken, "error", "service", "Shortcode not found: " + shortcode);
+            logService.log("error", "redirect", "Shortener", "Shortcode not found: " + shortcode);
             return null;
         }
 
         if (urlMapping.getExpirationDate().isBefore(LocalDateTime.now())) {
-            logService.log(authToken, "warn", "service", "Expired link accessed: " + shortcode);
+            logService.log("warn", "redirect", "Shortener", "Expired link accessed: " + shortcode);
             return null;
         }
 
@@ -76,23 +76,24 @@ public class UrlShortenerService {
                 .urlMapping(urlMapping)
                 .clickTimestamp(LocalDateTime.now())
                 .referrer(referrer)
-                .location("Noida, Uttar Pradesh, India") // Still hardcoded
+                .location("Noida, Uttar Pradesh, India") // Static location
                 .build();
         clickStatisticsRepository.save(stat);
 
-        logService.log(authToken, "info", "redirect", "Redirecting shortcode " + shortcode);
+        logService.log("info", "redirect", "Shortener", "Redirecting shortcode " + shortcode);
         return urlMapping.getOriginalUrl();
     }
 
-    public UrlStatisticsResponse getUrlStatistics(String shortcode, String authToken) {
+    public UrlStatisticsResponse getUrlStatistics(String shortcode) {
         UrlMapping urlMapping = urlMappingRepository.findById(shortcode).orElse(null);
 
         if (urlMapping == null) {
-            logService.log(authToken, "error", "service", "Statistics requested for non-existent shortcode: " + shortcode);
+            logService.log("error", "statistics", "Shortener", "No stats for shortcode: " + shortcode);
             return null;
         }
 
-        logService.log(authToken, "info", "statistics", "Statistics retrieved for shortcode: " + shortcode);
+        logService.log("info", "statistics", "Shortener", "Fetched stats for shortcode: " + shortcode);
+
         return UrlStatisticsResponse.builder()
                 .originalUrl(urlMapping.getOriginalUrl())
                 .creationDate(urlMapping.getCreationDate())
